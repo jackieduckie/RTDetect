@@ -5,7 +5,7 @@
 #' @return Returns the file to be tested.
 .testfile <- function(filename, location="extdata") {
     if (file.exists(filename)) return(filename)
-    f <- system.file(location, filename, package="StructuralVariantAnnotation")
+    f <- system.file(location, filename, package="RTDetect")
     if (!file.exists(f)) {
         f <- file.path(getwd(), "inst", location, filename)
     }
