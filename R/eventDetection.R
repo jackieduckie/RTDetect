@@ -1,101 +1,3 @@
-#' Detecting nuclear mitochondria fusion events.
-#'
-#' @details
-#' Nuclear mitochondrial fusion (NUMT) is a common event found in human genomes.
-#' This function searches for NUMT events by identifying breakpoints supporting the fusion of
-#' nuclear chromosome and mitochondrial genome. Only BND notations are supported at the current stage.
-#' Possible linked nuclear insertion sites are reported using SV IDs in the candidatePartnerId metadata column.
-#' @param gr A GRanges object
-#' @param nonStandardChromosomes Whether to report insertion sites on non-standard reference 
-#' chromosomes. Default value is set to FALSE.
-#' @param max_ins_dist The maxium distance allowed on the reference genome between the paired insertion sites.
-#' Only intra-chromosomal NUMT events are supported. Default value is 1000.
-#' @return A GRanges object of possible NUMT loci.
-#' @examples
-#' vcf.file <- system.file("extdata", "MT.vcf", package = "StructuralVariantAnnotation")
-#' vcf <- VariantAnnotation::readVcf(vcf.file, "hg19")
-#' gr <- breakpointRanges(vcf, nominalPosition=TRUE)
-#' numt.gr <- numtDetect(gr)
-#' @export
-numtDetect <- function(gr, nonStandardChromosomes=FALSE, max_ins_dist=1000){
-    assertthat::assert_that(class(gr)=="GRanges", msg = "gr should be a GRanges object")
-    assertthat::assert_that(length(gr)>0, msg = "gr can't be empty")
-    if (nonStandardChromosomes==FALSE) {
-        gr <- GenomeInfoDb::keepStandardChromosomes(gr, pruning.mode = "coarse", species = "Homo_sapiens")
-    }
-    numt.gr <- gr[!(seqnames(gr)=="chrM"|seqnames(gr)=="MT")]
-    numt.gr <- numt.gr[stringr::str_match(numt.gr$ALT, "(.*)(\\[|])(.*)(:)(.+)(\\[|])(.*)")[,4] %in% c("MT", "chrM")]
-    candidatePartnerId.list <- vector(mode="list", length=length(numt.gr))
-    names(candidatePartnerId.list) <- names(numt.gr)
-    if (length(numt.gr)>0) {
-        for (i in 1:length(numt.gr)) {
-            seq = seqnames(numt.gr[i])
-            pos = start(numt.gr[i])
-            std = strand(numt.gr[i])
-            name = names(numt.gr[i])
-            #candidatePartner.gr = numt.gr[seqnames(numt.gr)==seq & abs(start(numt.gr)-pos)< max_ins_dist & strand(numt.gr)!=std]
-            candidatePartnerIds = names(numt.gr[seqnames(numt.gr)==seq & abs(start(numt.gr)-pos)< max_ins_dist & strand(numt.gr)!=std])
-            candidatePartnerId.list[[name]] = ifelse(length(candidatePartnerIds)>0, candidatePartnerIds, NA)
-            # if (length(candidatePartner.gr)>0) {
-            #     candidatePartnerId = CharacterList(names(candidatePartner.gr))
-            #     #candidatePartnerId = paste(candidatePartner.gr$sourceId, collapse = ",")
-            #     #print(candidatePartnerId)
-            #     numt.gr$candidatePartnerId[i] = candidatePartnerId
-            # } else {
-            #     #numt.gr$candidatePartnerId[i] = N
-            #     candidatePartnerId.list[[]]
-            # }
-        }
-        #candidatePartnerId.list <- IRanges::CharacterList(candidatePartnerId.list)
-        numt.gr <- c(numt.gr, gr[names(partner(gr)) %in% names(numt.gr)])
-        numt.gr$candidatePartnerId <- rep(CharacterList(NA), length(numt.gr))
-        for (name in names(candidatePartnerId.list)) {
-            numt.gr[name]$candidatePartnerId <- candidatePartnerId.list[[name]]
-            numt.gr[names(partner(numt.gr))==name]$candidatePartnerId = candidatePartnerId.list[[name]]
-        }
-        return(numt.gr)
-    }else{
-        message("There is no NUMT event detected. Check whether 'chrM' or 'MT' is present in the VCF.")
-    }
-    #TODO: @param min_mt_len The minimum inserted mitochonrial genome length accepted. Default value is 30.
-}
-
-
-
-#' Calculating MT sequence length.
-#'
-#' @details
-#' This function calculate the length of MT sequence length with BND notations.
-#' @param bnd.start starting breakend of the MT sequence.
-#' @param bnd.end ending breakend of the MT sequence.
-#' @param chrM.len length of the reference MT genome.
-#' @return The length of the MT sequence. When the candidate MT BNDs can't be linked as one sequence, the returned value is NA.
-.mtLen <- function(bnd.start, bnd.end, chrM.len){
-    bnd.start.str <- stringr::str_match(bnd.start, "(.*)(\\[|])(.*)(:)(.+)(\\[|])(.*)")
-    bnd.end.str <- stringr::str_match(bnd.end, "(.*)(\\[|])(.*)(:)(.+)(\\[|])(.*)")
-    assertthat::assert_that(bnd.start.str[3] %in% c("[","]"))
-    assertthat::assert_that(bnd.end.str[3] %in% c("[","]"))
-    assertthat::assert_that(is.numeric(bnd.start.str[6]))
-    assertthat::assert_that(is.numeric(bnd.end.str[6]))
-    if (bnd.start.str[3]=="[" & bnd.end.str[3]=="]") {
-        if (bnd.start.str[6]<bnd.end.str[6]) {
-            dist=bnd.end.str[6]-bnd.start.str[6]
-        }else if (bnd.start.str[6]>=bnd.end.str[6]) {
-            dist=bnd.end.str[6]-bnd.start.str[6]+chrM.len
-        }
-    }else if (bnd.start.str[3]=="]" & bnd.end.str[3]=="[") {
-        if (bnd.start.str[6]<bnd.end.str[6]) {
-            dist=chrM.len-bnd.end.str[6]+bnd.start.str[6]
-        }else if (bnd.start.str[6]>=bnd.end.str[6]) {
-            dist=bnd.start.str[6]-bnd.end.str[6]
-        }
-    }else {
-        dist=NA
-    }
-    return(dist)
-}
-
-
 #' Detecting retrotranscript insertion in nuclear genomes.
 #'
 #' @details
@@ -118,7 +20,7 @@ numtDetect <- function(gr, nonStandardChromosomes=FALSE, max_ins_dist=1000){
 #' rt <- rtDetect(gr, genes, maxgap=30, minscore=0.6)
 #' @export
 #' 
-rtDetect <- function(gr, genes, maxgap=100, minscore=0.3){
+rtDetect <- function(gr, genes, maxgap=100, minscore=0.4){
     #message("rtDetect")
     #check args
     assertthat::assert_that(class(gr)=="GRanges", msg = "gr should be a GRanges object")
@@ -129,11 +31,6 @@ rtDetect <- function(gr, genes, maxgap=100, minscore=0.3){
     GenomeInfoDb::seqlevelsStyle(genes) <- GenomeInfoDb::seqlevelsStyle(gr)[1]
     genes <- GenomeInfoDb::keepSeqlevels(genes, seqlevels(genes)[1:24], pruning.mode = "coarse")
     exons <- exons(genes, columns=c("exon_id", "tx_id", "tx_name","gene_id"))
-    
-    #------------------------
-    #testing only
-    #gr <- breakpointRanges(manta)
-    #------------------------
     
     #find exon-SV overlaps:
     hits.start <- findOverlaps(gr, exons, maxgap = maxgap, type = "start", ignore.strand = TRUE)
@@ -220,11 +117,42 @@ rtDetect <- function(gr, genes, maxgap=100, minscore=0.3){
         insSite.gr$rtFound <- mapply(stringr::str_detect, insSite.gr$txs, paste(tx.rank$tx_name, collapse = "|"))
         insSite.gr$rtFoundSum <- sapply(insSite.gr$rtFound, function(x) {sum(x) > 0})
         
+        # 5.create one GrangesList per gene
+        #get all genes detected
+        rt.gr$gene_symbol <- .txs2genesym(rt.gr$txs)
+        insSite.gr$gene_symbol <- .txs2genesym(insSite.gr$txs)
+        l_gene_symbol <- unique(c(unlist(rt.gr$gene_symbol), unlist(insSite.gr$gene_symbol)))
+        
+        #RT GRangesList by gene
+        rt.gr.idx <- lapply(l_gene_symbol, function(gs) 
+            sapply(rt.gr$gene_symbol, function(x) gs %in% x))
+        rt.grlist <- setNames(lapply(rt.gr.idx, 
+                                     function(i) list(rt=rt.gr[i])), l_gene_symbol)
+        # rt.grlist <- lapply(rt.gr.idx, function(i) rt.gr[i])
+        # names(rt.grlist) <- l_gene_symbol
+        
+        #InsSite GRangesList by gene
+        insSite.gr.idx <- lapply(l_gene_symbol, function(gs) 
+            sapply(insSite.gr$gene_symbol, function(x) gs %in% x))
+            #including partnered insSite bnds which don't have a gene symbol labelling (NA)
+        insSite.grlist <- setNames(lapply(insSite.gr.idx, 
+                                          function(i) list(insSite=c(insSite.gr[i],
+                                                                     partner(insSite.gr)[i]))), 
+                                   l_gene_symbol)
+        # insSite.grlist <- lapply(insSite.gr.idx, function(i) insSite.gr[i])
+        # names(insSite.grlist) <- l_gene_symbol
+        
+        #group inssite and rt as one GRangesList
+        gr.list <- pc(rt.grlist, insSite.grlist)
+        gr.list <- lapply(gr.list, function(x) setNames(x, c('junctions', 'insSite')))
         
         #TODO: add L1/Alu annotation for insertion site filtering.
         
+        #NOTE: GrangesList require all GRanges share the same mcols!
+        #return(GRangesList(insSite = insSite.gr, rt = rt.gr))
+        #return(GRangesList(insSite=GRangesList(insSite.grlist), rt=GRangesList(rt.grlist)))
+        return(gr.list)
         
-        return(GRangesList(insSite = insSite.gr, rt = rt.gr))
     }
 }
 
@@ -262,4 +190,24 @@ rtDetect <- function(gr, genes, maxgap=100, minscore=0.3){
                       score= overlapIntron.df$count / (sapply(overlapIntron.df$exon_rank, length)-1)))
 }
 
+#' Adding gene symbol annotations
+#' @details 
+#' This is an internal function which takes a list of txs in UCSC id format as input 
+#' and convert the txs to gene symbol.
+#' @param txs A list of transcript ids in UCSC format.
+#' @param unique.genesyms TRUE or FALSE. If TRUE, the converted gene symbols will remove duplicates.
+#' @return A list of names in gene symbols
+.txs2genesym <- function(txs, unique.genesyms=TRUE){
+    assertthat::assert_that(class(txs)=="list", msg = "txs should be a list object")
+    #ucsc id to gene symbol look up table
+    gene_symbol <- read.delim(system.file("extdata", "gene_symbol.txt", package = "RTDetect"), 
+                              header=TRUE, comment.char="#")
+    gene_symbol <- bind_rows(gene_symbol, data.frame(kgID=NA, geneSymbol=NA))
 
+    #txs <- RT$insSite$txs
+    gene_syms <- lapply(txs, function(x) gene_symbol$geneSymbol[gene_symbol$kgID %in% x])
+    if (unique.genesyms) {
+        gene_syms <- lapply(gene_syms, unique)
+    }
+    return(gene_syms)
+}
