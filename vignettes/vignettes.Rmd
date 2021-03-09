@@ -40,6 +40,7 @@ consulting the vignettes in the corresponding packages with `browseVignettes("Va
 ```{r input, warning=FALSE, message=FALSE}
 suppressPackageStartupMessages(require(StructuralVariantAnnotation))
 suppressPackageStartupMessages(require(VariantAnnotation))
+suppressPackageStartupMessages(require(RTDetect))
 vcf.file <- system.file("extdata", "gridss.vcf", package = "RTDetect")
 vcf <- VariantAnnotation::readVcf(vcf.file, "hg19")
 gr <- StructuralVariantAnnotation::breakpointRanges(vcf)
@@ -51,7 +52,7 @@ Note that `StructuralVariantAnnotation` requires the `GRanges` object to be comp
 The package provides `rtDetect` to identify RTs using the provided SV calls. This is achieved by detecting intronic deletions, which are breakpoints at exon-intron (and intron-exon) boundaries of a transcript. Fusions consisting of an exon boundary and a second genomic location are reported as potential insertion sites. Due to the complexity of RT events, insertion sites can be discovered on both left and right sides, only one side, or none at all.
 
 #TODO: edit output description
-The output is a list of `GRanges` object consisting of two sets of `GRanges` calls, `insSite` and `rt`, containing candidate insertion sites and exon-exon junctions respectively. Candidate insertion sites are annotated by the source transcripts and whether exon-exon junctions are detected for the source transcripts. RT junction breakends are annotated by the UCSC exon IDs, corresponding transcripts, and NCBI gene symbols.
+The output is a list of `GRanges` object consisting of two sets of `GRanges` calls, `insSite` and `junctions`, containing candidate insertion sites and exon-exon junctions respectively. Candidate insertion sites are annotated by the source transcripts and whether exon-exon junctions are detected for the source transcripts. RT junction breakends are annotated by the UCSC exon IDs, corresponding transcripts, and NCBI gene symbols.
 
 ```{r}
 suppressPackageStartupMessages(require(TxDb.Hsapiens.UCSC.hg19.knownGene))
@@ -68,46 +69,28 @@ RT$SKA3
 
 ## Visualising breakpoint pairs via circos plots
 
-One way of visualising paired breakpoints is by circos plots. Here we use the package
+One way of visualising RT is by circos plots. Here we use the package
 [`circlize`](https://doi.org/10.1093/bioinformatics/btu393) to demonstrate 
-breakpoint visualisation. The `bedpe2circos` function takes BEDPE-formatted 
-dataframes (see `breakpointgr2bedpe()`) and plotting parameters for the
-`circos.initializeWithIdeogram()` and `circos.genomicLink()` functions 
-from `circlize`.
+the visualisation of insertion site and exon-exon junctions. 
 
-To generate a simple circos plot of paired breakpoints:
+To generate a simple circos plot of RT event with SKA3 transcript:
 ```{r}
 suppressPackageStartupMessages(require(circlize))
-colo829_bpgr_with_chr_prefix <- colo829_bpgr
-seqlevelsStyle(colo829_bpgr_with_chr_prefix) <- "UCSC"
-pairs <- breakpointgr2pairs(colo829_bpgr_with_chr_prefix)
-circos.initializeWithIdeogram()
+rt_chr_prefix <- c(RT$SKA3$junctions, RT$SKA3$insSite)
+seqlevelsStyle(rt_chr_prefix) <- "UCSC"
+pairs <- breakpointgr2pairs(rt_chr_prefix)
+pairs
+```
+To see supporting breakpoints clearly, we generate the circos plot according to the loci of event.
+```{r}
+circos.initializeWithIdeogram(
+    data.frame(V1=c("chr13", "chr11"), 
+               V2=c(21720000,108585000), 
+               V3=c(21755000,108586000), 
+               V4=c("q12.11","q24.3"), 
+               V5=c("gneg","gpos50")))
 circos.genomicLink(as.data.frame(S4Vectors::first(pairs)), as.data.frame(S4Vectors::second(pairs)))
 circos.clear()
-```
-
-Alternatively, the plotting package `ggbio` provides flexible track
-functions which bind
-with `ggplot2` objects. It takes `GRanges` objects as input and supports circos
-plots.
-To plot structural variant breakpoints in a circos plot using `ggbio`, we need
-to first prepare the breakpoint GRanges. The function requires a special column,
-indicating the end of the link using GRanges format, which we can add to `gr` using
-[`plyranges`](https://bioconductor.org/packages/release/bioc/html/plyranges.html).
-```{r add to.gr}
-suppressPackageStartupMessages(require(ggbio))
-gr.circos <- colo829_bpgr[seqnames(colo829_bpgr) %in% seqlevels(biovizBase::hg19sub)]
-seqlevels(gr.circos) <- seqlevels(biovizBase::hg19sub)
-mcols(gr.circos)$to.gr <- granges(partner(gr.circos))
-```
-We can then plot the breakpoints against reference genomes.
-```{r ggbio}
-p <- ggbio() +
-	circle(gr.circos, geom="link", linked.to="to.gr") +
-	circle(biovizBase::hg19sub, geom='ideo', fill='gray70') +
-	circle(biovizBase::hg19sub, geom='scale', size=2) +
-	circle(biovizBase::hg19sub, geom='text', aes(label=seqnames), vjust=0, size=3)
-p
 ```
 
 ## SessionInfo

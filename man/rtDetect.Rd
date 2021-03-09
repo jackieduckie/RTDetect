@@ -4,7 +4,7 @@
 \alias{rtDetect}
 \title{Detecting retrotranscript insertion in nuclear genomes.}
 \usage{
-rtDetect(gr, genes, maxgap = 100, minscore = 0.3)
+rtDetect(gr, genes, maxgap = 100, minscore = 0.4)
 }
 \arguments{
 \item{gr}{A GRanges object}
