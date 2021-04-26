@@ -14,7 +14,7 @@
 #' library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 #' genes <- TxDb.Hsapiens.UCSC.hg19.knownGene
 #' vcf.file <- system.file("extdata", "diploidSV.vcf",
-#'                          package = "StructuralVariantAnnotation")
+#'                          package = "RTDetect")
 #' vcf <- VariantAnnotation::readVcf(vcf.file, "hg19")
 #' gr <- breakpointRanges(vcf, nominalPosition=TRUE)
 #' rt <- rtDetect(gr, genes, maxgap=30, minscore=0.6)
@@ -45,8 +45,8 @@ rtDetect <- function(gr, genes, maxgap=100, minscore=0.4){
     
     # 2.return breakpoints of insertionSite-exon 
     hits.insSite <- hits[!same.tx,] %>%
-        bind_rows(.,anti_join(dplyr::as_tibble(hits.start), dplyr::as_tibble(hits.end), by='queryHits')) %>%
-        bind_rows(.,anti_join(dplyr::as_tibble(hits.end), dplyr::as_tibble(hits.start), by='queryHits'))
+        dplyr::bind_rows(dplyr::anti_join(dplyr::as_tibble(hits.start), dplyr::as_tibble(hits.end), by='queryHits')) %>%
+        dplyr::bind_rows(dplyr::anti_join(dplyr::as_tibble(hits.end), dplyr::as_tibble(hits.start), by='queryHits'))
     
     # hits.insSite <- rbind(hits[!same.tx,],
     #                       anti_join(dplyr::as_tibble(hits.start), dplyr::as_tibble(hits.end), by='queryHits'),
@@ -96,8 +96,8 @@ rtDetect <- function(gr, genes, maxgap=100, minscore=0.4){
         
         # 4.filter insertion site junctions, reduce duplications
         #junctions with only one side overlapping with exons:
-        idx <- bind_rows(anti_join(dplyr::as_tibble(hits.start), dplyr::as_tibble(hits.end), by='queryHits'),
-                         anti_join(dplyr::as_tibble(hits.end), dplyr::as_tibble(hits.start), by='queryHits'))
+        idx <- dplyr::bind_rows(dplyr::anti_join(dplyr::as_tibble(hits.start), dplyr::as_tibble(hits.end), by='queryHits'),
+                                dplyr::anti_join(dplyr::as_tibble(hits.end), dplyr::as_tibble(hits.start), by='queryHits'))
         
         insSite.gr <- c(gr[hits[!same.tx,]$queryHits], partner(gr)[hits[!same.tx,]$queryHits], gr[idx$queryHits])
         insSite.gr$exons <- c(exons[hits[!same.tx,]$subjectHits.x]$exon_id, exons[hits[!same.tx,]$subjectHits.y]$exon_id,
@@ -156,58 +156,5 @@ rtDetect <- function(gr, genes, maxgap=100, minscore=0.4){
     }
 }
 
-#' Combining matching transcripts 
-#' @details
-#' This is an internal function used to merge all overlapping transcripts of a breakpoint into one vector.
-#' @param gr A GRanges object
-#' @param names A vector of granges names.
-#' @return A list of vectors. Each vector is named with the name of the corresponding granges.
-.combineMatchingTranscripts <- function(gr, names){
-    names <- unique(names)
-    txs.list <- vector(mode="list", length=length(names))
-    names(txs.list) <- names
-    for (name in names) {
-        #txs.list[[name]] <- name
-        txs.list[[name]] <- Reduce(union, gr[names(gr) == name]$txs)
-    }
-    return(txs.list)
-}
 
-#' Ranking matching transcripts
-#' @details
-#' This is an internal function which returns overlapping transcript names with ranking scores. 
-#' The ranking score is the proportion of exon-exon fusions (intronic deletion events) detected for a given transcript.
-#' @param genes TxDb object of genes. hg19 and hg38 are supported in the current version.
-#' @param transcripts.col A vector of transcript names.
-#' @return A dataframe with two columns, tx_name and score. 
-.scoreByTranscripts <- function(genes, transcripts.col){
-    overlapIntron.df <- as.data.frame(table(transcripts.col)/2)
-    colnames(overlapIntron.df) <- c("tx_name", "count")
-    overlapIntron.df <- merge(overlapIntron.df, 
-                              mcols(GenomicFeatures::transcripts(genes, columns=c("tx_name","exon_rank"), 
-                                                                 filter=list(tx_name=overlapIntron.df[,1]))))
-    return(data.frame(tx_name=overlapIntron.df$tx_name, 
-                      score= overlapIntron.df$count / (sapply(overlapIntron.df$exon_rank, length)-1)))
-}
 
-#' Adding gene symbol annotations
-#' @details 
-#' This is an internal function which takes a list of txs in UCSC id format as input 
-#' and convert the txs to gene symbol.
-#' @param txs A list of transcript ids in UCSC format.
-#' @param unique.genesyms TRUE or FALSE. If TRUE, the converted gene symbols will remove duplicates.
-#' @return A list of names in gene symbols
-.txs2genesym <- function(txs, unique.genesyms=TRUE){
-    assertthat::assert_that(class(txs)=="list", msg = "txs should be a list object")
-    #ucsc id to gene symbol look up table
-    gene_symbol <- read.delim(system.file("extdata", "gene_symbol.txt", package = "RTDetect"), 
-                              header=TRUE, comment.char="#")
-    gene_symbol <- bind_rows(gene_symbol, data.frame(kgID=NA, geneSymbol=NA))
-
-    #txs <- RT$insSite$txs
-    gene_syms <- lapply(txs, function(x) gene_symbol$geneSymbol[gene_symbol$kgID %in% x])
-    if (unique.genesyms) {
-        gene_syms <- lapply(gene_syms, unique)
-    }
-    return(gene_syms)
-}

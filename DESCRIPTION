@@ -1,7 +1,7 @@
 Package: RTDetect
 Type: Package
 Title: Retrotransposed transcript detection from structural variants
-Version: 1.0.0
+Version: 0.99.0
 Date: 2020-04-15
 Authors@R: c(
 	person("Ruining", "Dong", email="dong.rn@wehi.edu.au", role=c("aut","cre"), comment=c(ORCID = "0000-0003-1433-0484")))
@@ -21,7 +21,9 @@ Imports:
     dplyr,
     methods,
     rlang,
-    GenomicFeatures
+    GenomicFeatures,
+    stats,
+    utils
 Suggests:
     BSgenome.Hsapiens.UCSC.hg19,
     TxDb.Hsapiens.UCSC.hg19.knownGene,
@@ -32,8 +34,6 @@ Suggests:
     covr,
     knitr,
     plyranges,
-    ggbio,
-    biovizBase,
     circlize,
     tictoc,
     GenomeInfoDb,

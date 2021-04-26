@@ -1,6 +1,6 @@
 ---
-title: "StructuralVariantAnnotation Quick Overview"
-author: "Ruining Dong, Daniel Cameron"
+title: "RTDetect Quick Overview"
+author: "Ruining Dong"
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -9,7 +9,7 @@ output:
       collapsed: yes
       smooth_scroll: yes
 vignette: >
-  %\VignetteIndexEntry{Structural Variant Annotation Package}
+  %\VignetteIndexEntry{RTDetect Package}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -22,7 +22,7 @@ knitr::opts_chunk$set(#echo = TRUE,
 ```
 
 ## Introduction
-This vignette outlines a workflow of parsing and plotting structural variants from Variant Call Format (VCF) using the `StructuralVariantAnnotation` package. `StructuralVariantAnnotation` contains useful helper functions for reading and interpreting structural variant calls. The package contains functions for parsing VCFs from a number of popular callers, dealing with breakpoints involving two separate genomic loci encoded as `GRanges` objects, as well as identifying various biological phenomena. Currently the identification of retroposed transcripts (RTs) and nuclear mitochondrial integrations (NUMTs) are supported.
+This vignette outlines a workflow of detecting retrotransposed transcripts (RTs) from Variant Call Format (VCF) using the `RTDetect` package. 
 
 
 ## Using GRanges for structural variants: a breakend-centric data structure
@@ -41,9 +41,9 @@ consulting the vignettes in the corresponding packages with `browseVignettes("Va
 suppressPackageStartupMessages(require(StructuralVariantAnnotation))
 suppressPackageStartupMessages(require(VariantAnnotation))
 suppressPackageStartupMessages(require(RTDetect))
-vcf.file <- system.file("extdata", "gridss.vcf", package = "RTDetect")
-vcf <- VariantAnnotation::readVcf(vcf.file, "hg19")
-gr <- StructuralVariantAnnotation::breakpointRanges(vcf)
+
+RT_vcf <- readVcf(system.file("extdata", "diploidSV.vcf", package = "RTDetect"))
+RT_gr <- StructuralVariantAnnotation::breakpointRanges(RT_vcf, nominalPosition=TRUE)
 ```
 
 Note that `StructuralVariantAnnotation` requires the `GRanges` object to be composed entirely of valid breakpoints. Please consult the vignette of the `StructuralVariantAnnotation` package for ensuring breakpoint consistency.
@@ -51,15 +51,13 @@ Note that `StructuralVariantAnnotation` requires the `GRanges` object to be comp
 ### Identifying Retrotransposed Transcripts
 The package provides `rtDetect` to identify RTs using the provided SV calls. This is achieved by detecting intronic deletions, which are breakpoints at exon-intron (and intron-exon) boundaries of a transcript. Fusions consisting of an exon boundary and a second genomic location are reported as potential insertion sites. Due to the complexity of RT events, insertion sites can be discovered on both left and right sides, only one side, or none at all.
 
-#TODO: edit output description
 The output is a list of `GRanges` object consisting of two sets of `GRanges` calls, `insSite` and `junctions`, containing candidate insertion sites and exon-exon junctions respectively. Candidate insertion sites are annotated by the source transcripts and whether exon-exon junctions are detected for the source transcripts. RT junction breakends are annotated by the UCSC exon IDs, corresponding transcripts, and NCBI gene symbols.
 
 ```{r}
 suppressPackageStartupMessages(require(TxDb.Hsapiens.UCSC.hg19.knownGene))
 suppressPackageStartupMessages(require(dplyr))
 hg19.genes <- TxDb.Hsapiens.UCSC.hg19.knownGene
-RT_vcf <- readVcf(system.file("extdata", "diploidSV.vcf", package = "RTDetect"))
-RT_gr <- StructuralVariantAnnotation::breakpointRanges(RT_vcf, nominalPosition=TRUE)
+
 RT <- rtDetect(RT_gr, hg19.genes, maxgap=50, minscore=0.3)
 ```
 ```{r}

@@ -1,4 +1,4 @@
 library(testthat)
-library(StructuralVariantAnnotation)
+library(RTDetect)
 
-test_check("StructuralVariantAnnotation")
+test_check("RTDetect")

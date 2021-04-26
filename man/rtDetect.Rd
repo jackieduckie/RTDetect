@@ -31,7 +31,7 @@ Only BND notations are supported at the current stage.
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 genes <- TxDb.Hsapiens.UCSC.hg19.knownGene
 vcf.file <- system.file("extdata", "diploidSV.vcf",
-                         package = "StructuralVariantAnnotation")
+                         package = "RTDetect")
 vcf <- VariantAnnotation::readVcf(vcf.file, "hg19")
 gr <- breakpointRanges(vcf, nominalPosition=TRUE)
 rt <- rtDetect(gr, genes, maxgap=30, minscore=0.6)

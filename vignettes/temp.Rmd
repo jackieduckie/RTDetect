@@ -1,0 +1,25 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(rpart.plot)
+library(rpart)
+library(ggplot2)
+library(dplyr)
+#sex_marcel <- read_table2("~/Downloads/sex_marcel.txt")
+
+
+```
+```{r}
+tree2 <- rpart(sex~., data=sex_marcel[-1])
+rpart.plot(tree2)
+```
+
+```{r}
+
+tree3 <- rpart(sex~., data=sex_marcel[-c(1,2)])
+rpart.plot(tree3)
+```
+
